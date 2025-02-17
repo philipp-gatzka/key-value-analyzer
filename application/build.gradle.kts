@@ -1,5 +1,8 @@
 @file:Suppress("SpellCheckingInspection")
 
+import org.apache.tools.ant.filters.ReplaceTokens
+
+
 plugins {
     id("java")
     id("idea")
@@ -28,6 +31,20 @@ tasks {
     withType<JavaCompile> {
         options.encoding = "UTF-8"
     }
+    processResources {
+        duplicatesStrategy = DuplicatesStrategy.INCLUDE
+        from("src/main/resources") {
+            include("application-development.properties")
+
+            project.properties.forEach { (key, value) ->
+                if (key != null) {
+                    filter<ReplaceTokens>("tokens" to mapOf(key to value.toString()))
+                    filter<ReplaceTokens>("tokens" to mapOf("project.$key" to value.toString()))
+                }
+            }
+        }
+    }
+
 }
 
 vaadin {

@@ -50,7 +50,7 @@ public class DataInitializer implements ApplicationListener<ApplicationReadyEven
             measuredProcessOf("updating item data", this::fetchItemData);
             measuredProcessOf("updating item types", this::fetchItemTypes);
             measuredProcessOf("updating keys", this::fetchKeys);
-            measuredProcessOf("updating item prices", () -> this.fetchItemPrices(false));
+            measuredProcessOf("updating item prices", this::forceFetchItemPrices);
         } catch (Exception e) {
             log.error("Error initializing data", e);
         }
