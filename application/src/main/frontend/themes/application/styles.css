@@ -1,0 +1,38 @@
+@import url('./main-layout.css');
+@import url('./views/grid.css');
+
+/* html {
+    --lumo-font-family: 'Bender Regular'
+} */
+
+
+
+[theme~="dark"] {
+    --lumo-shade-5pct: rgba(28, 31, 34, 0.05);
+    --lumo-shade-10pct: rgba(28, 31, 34, 0.1);
+    --lumo-shade-20pct: rgba(28, 31, 34, 0.2);
+    --lumo-shade-30pct: rgba(28, 31, 34, 0.3);
+    --lumo-shade-40pct: rgba(28, 31, 34, 0.4);
+    --lumo-shade-50pct: rgba(28, 31, 34, 0.5);
+    --lumo-shade-60pct: rgba(28, 31, 34, 0.6);
+    --lumo-shade-70pct: rgba(28, 31, 34, 0.7);
+    --lumo-shade-80pct: rgba(28, 31, 34, 0.8);
+    --lumo-shade-90pct: rgba(28, 31, 34, 0.9);
+    --lumo-primary-color-50pct: rgba(160, 164, 127, 0.5);
+    --lumo-primary-color-10pct: rgba(160, 164, 127, 0.1);
+    --lumo-error-color-50pct: rgba(140, 62, 62, 0.5);
+    --lumo-error-color-10pct: rgba(140, 62, 62, 0.1);
+    --lumo-success-color-50pct: rgba(92, 122, 92, 0.5);
+    --lumo-success-color-10pct: rgba(92, 122, 92, 0.1);
+    --lumo-shade: rgb(28, 31, 34);
+    --lumo-primary-color: rgb(160, 164, 127);
+    --lumo-primary-text-color: rgb(160, 164, 127);
+    --lumo-error-color: rgb(140, 62, 62);
+    --lumo-error-text-color: rgb(140, 62, 62);
+    --lumo-success-color: rgb(92, 122, 92);
+    --lumo-success-contrast-color: hsl(159, 29%, 10%);
+    --lumo-success-text-color: rgb(92, 122, 92);
+    --lumo-base-color: rgb(15, 18, 21);
+    --lumo-body-text-color: rgb(192, 195, 197);
+
+}

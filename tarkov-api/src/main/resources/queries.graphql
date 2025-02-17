@@ -1,0 +1,48 @@
+query FetchItemIds {
+    items {
+        id
+    }
+}
+
+query FetchItemData {
+    items {
+        id
+        name
+        updated
+        image8xLink
+    }
+}
+
+query FetchItemTypes {
+    items {
+        id
+        types
+        updated
+    }
+}
+
+query FetchItemPrices {
+    items {
+        id
+        lastLowPrice
+        sellFor {
+            vendor {
+                name
+            }
+            priceRUB
+        }
+        updated
+    }
+}
+
+query FetchKeys {
+    items(type: keys) {
+        id
+        properties {
+            ... on ItemPropertiesKey {
+                uses
+            }
+        }
+        updated
+    }
+}
