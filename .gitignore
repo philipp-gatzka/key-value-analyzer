@@ -1,0 +1,16 @@
+/.gradle/
+/.idea
+/application/build
+/application/node_modules
+/application/src/main/frontend/generated
+/datamodel/build
+/tarkov-api/build
+
+
+/application/package.json
+/application/package-lock.json
+/application/src/main/bundles
+/application/tsconfig.json
+/application/types.d.ts
+/application/vite.config.ts
+/application/vite.generated.ts
