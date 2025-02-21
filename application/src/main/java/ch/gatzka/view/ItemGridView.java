@@ -1,17 +1,22 @@
 package ch.gatzka.view;
 
-import ch.gatzka.repository.TypeRepository;
+import ch.gatzka.enums.GameMode;
 import ch.gatzka.repository.view.ItemGridViewRepository;
+import ch.gatzka.repository.view.TagViewRepository;
+import ch.gatzka.security.AuthenticatedAccount;
 import ch.gatzka.tables.records.ItemGridViewRecord;
-import ch.gatzka.tables.records.TypeRecord;
+import ch.gatzka.tables.records.TagViewRecord;
 import com.vaadin.flow.component.Key;
+import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.Unit;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.combobox.ComboBox;
+import com.vaadin.flow.component.combobox.MultiSelectComboBox;
 import com.vaadin.flow.component.grid.Grid;
 import com.vaadin.flow.component.grid.GridVariant;
 import com.vaadin.flow.component.html.Image;
+import com.vaadin.flow.component.html.Span;
 import com.vaadin.flow.component.icon.Icon;
 import com.vaadin.flow.component.icon.VaadinIcon;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
@@ -22,12 +27,16 @@ import com.vaadin.flow.router.Menu;
 import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
 import com.vaadin.flow.server.auth.AnonymousAllowed;
+import com.vaadin.flow.theme.lumo.LumoIcon;
 import org.jooq.Condition;
 import org.jooq.Result;
+import org.jooq.impl.DSL;
 import org.vaadin.lineawesome.LineAwesomeIconUrl;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import static ch.gatzka.Tables.ITEM_GRID_VIEW;
 
@@ -43,91 +52,130 @@ public class ItemGridView extends VerticalLayout {
 
     private final Map<String, Condition> conditions = new HashMap<>();
 
-    private final TypeRepository typeRepository;
+    private final List<String> tags;
 
-    public ItemGridView(ItemGridViewRepository itemGridViewRepository, TypeRepository typeRepository) {
+    private final GameMode gameMode;
+
+    public ItemGridView(ItemGridViewRepository itemGridViewRepository, AuthenticatedAccount authenticatedAccount, TagViewRepository tagViewRepository) {
         this.itemGridViewRepository = itemGridViewRepository;
-        this.typeRepository = typeRepository;
+
+        this.tags = tagViewRepository.readAll().map(TagViewRecord::getCleanName);
+
+        if (authenticatedAccount.get().isPresent()) {
+            gameMode = authenticatedAccount.get().get().account().getGameMode();
+        } else {
+            gameMode = GameMode.PvP;
+        }
+
+        setSizeFull();
 
         createHeader();
         createGrid();
-
-        setSizeFull();
+        createFooter();
 
         refreshGrid();
     }
 
+    private void addCondition(String key, Condition conditions) {
+        this.conditions.put(key, conditions);
+    }
+
+    private void removeCondition(String key) {
+        this.conditions.remove(key);
+    }
+
     private void createHeader() {
         TextField nameField = new TextField("Name");
-        nameField.setWidthFull();
         nameField.setPlaceholder("Filter by name");
+        nameField.setWidthFull();
         nameField.addValueChangeListener(event -> {
-            String newValue = event.getValue();
-            if (newValue == null || newValue.isEmpty()) {
+            String value = event.getValue();
+            if (value == null || value.isEmpty()) {
                 conditions.remove("name");
+                removeCondition("name");
             } else {
-                conditions.put("name", ITEM_GRID_VIEW.NAME.likeIgnoreCase("%" + newValue + "%"));
+                addCondition("name", ITEM_GRID_VIEW.NAME.likeIgnoreCase("%" + value + "%"));
             }
         });
 
-        ComboBox<String> typeField = new ComboBox<>("Type");
-        typeField.setWidthFull();
-        typeField.setPlaceholder("Filter by type");
-        typeField.setItems(typeRepository.readAll().map(TypeRecord::getName));
-        typeField.addValueChangeListener(event -> {
-            String newValue = event.getValue();
-            if (newValue == null || newValue.isEmpty()) {
-                conditions.remove("type");
+        ComboBox<Boolean> bannedOnFleaField = new ComboBox<>("Can be sold on Flea Market");
+        bannedOnFleaField.setPlaceholder("Filter by flea market blacklist");
+        bannedOnFleaField.setItems(true, false);
+        bannedOnFleaField.setWidthFull();
+        bannedOnFleaField.setClearButtonVisible(true);
+        bannedOnFleaField.addValueChangeListener(event -> {
+            if (event.getValue() == null) {
+                removeCondition("itemBannedOnFlea");
             } else {
-                conditions.put("type", ITEM_GRID_VIEW.TYPES.likeIgnoreCase("%" + newValue + "%"));
+                addCondition("itemBannedOnFlea", ITEM_GRID_VIEW.ITEM_BANNED_ON_FLEA.eq(!event.getValue()));
+            }
+        });
+
+        MultiSelectComboBox<String> tagSelect = new MultiSelectComboBox<>("Tags");
+        tagSelect.setItems(tags);
+        tagSelect.setPlaceholder("Filter by tags");
+        tagSelect.setClearButtonVisible(true);
+        tagSelect.setWidthFull();
+        tagSelect.addValueChangeListener(event -> {
+            Set<String> tags = event.getValue();
+            if (tags == null || tags.isEmpty()) {
+                removeCondition("tags");
+            } else {
+                Condition condition = DSL.falseCondition();
+                for (String tag : tags) {
+                    condition = condition.or(ITEM_GRID_VIEW.TAGS.likeIgnoreCase("%" + tag + "%"));
+                }
+                addCondition("tags", condition);
             }
         });
 
         Button resetButton = new Button("Reset");
-        resetButton.setWidthFull();
         resetButton.setIcon(new Icon(VaadinIcon.TRASH));
+        resetButton.setWidthFull();
         resetButton.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
         resetButton.addClickListener(_ -> {
             nameField.clear();
-            typeField.clear();
-            conditions.clear();
+            bannedOnFleaField.clear();
+            tagSelect.clear();
+
             refreshGrid();
         });
 
         Button searchButton = new Button("Search");
-        searchButton.setWidthFull();
         searchButton.setIcon(new Icon(VaadinIcon.SEARCH));
-        searchButton.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
+        searchButton.setWidthFull();
         searchButton.addClickListener(_ -> refreshGrid());
+        searchButton.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
         searchButton.addClickShortcut(Key.ENTER);
 
-        VerticalLayout buttonLayout = new VerticalLayout(resetButton, searchButton);
-        buttonLayout.setSpacing(false);
-        buttonLayout.setPadding(false);
-        buttonLayout.setWidth("min-content");
+        VerticalLayout buttons = new VerticalLayout(resetButton, searchButton);
+        buttons.setSpacing(false);
+        buttons.setWidth("min-content");
+        buttons.setPadding(false);
+        buttons.getThemeList().add("spacing-xs");
 
-        HorizontalLayout header = new HorizontalLayout(nameField, typeField, buttonLayout);
+        HorizontalLayout header = new HorizontalLayout(nameField, bannedOnFleaField, tagSelect, buttons);
+        header.setAlignSelf(Alignment.END, nameField, bannedOnFleaField, tagSelect);
         header.setWidthFull();
-        header.setAlignSelf(Alignment.END, nameField);
-        header.setAlignSelf(Alignment.END, typeField);
-
+        header.setPadding(false);
         add(header);
     }
 
-    private void createGrid() {
-        grid.addThemeVariants(GridVariant.LUMO_ROW_STRIPES);
-        grid.addComponentColumn(data -> {
-            Image image = new Image(data.getImageLink() == null ? data.getName() : data.getImageLink(), data.getName());
-            image.setMaxHeight(50, Unit.PIXELS);
-            return image;
-        }).setHeader("Image");
-        grid.addColumn("name").setHeader("Name");
-        grid.addColumn(data -> data.getTypes().replace("|", ", ")).setHeader("Types");
-        grid.addColumn("buyPrice").setRenderer(new TextRenderer<>(ItemGridViewRecord::getBuyPriceRouble)).setHeader("Price");
-        grid.addColumn("sellPrice").setRenderer(new TextRenderer<>(ItemGridViewRecord::getSellPriceRouble)).setHeader("Sell Price");
-        grid.addColumn("sellAt").setHeader("Sell At");
-
-        add(grid);
+    private void createFooter() {
+        // Select<String> modeSelect = new Select<>();
+        // modeSelect.setItems("PvE", "PvP");
+        // modeSelect.setValue("PvP");
+        // modeSelect.addValueChangeListener(event -> {
+        //     grid.getColumnByKey("pveSellPriceFlea").setVisible(event.getValue().equals("PvE"));
+        //     grid.getColumnByKey("pvpSellPriceFlea").setVisible(event.getValue().equals("PvP"));
+        //     grid.getColumnByKey("pveSellPriceTrader").setVisible(event.getValue().equals("PvE"));
+        //     grid.getColumnByKey("pvpSellPriceTrader").setVisible(event.getValue().equals("PvP"));
+        // });
+        // HorizontalLayout spacer = new HorizontalLayout();
+        // spacer.setWidthFull();
+        // HorizontalLayout layout = new HorizontalLayout(spacer, modeSelect);
+        // layout.setWidthFull();
+        // add(layout);
     }
 
     private void refreshGrid() {
@@ -136,4 +184,55 @@ public class ItemGridView extends VerticalLayout {
         grid.setItems(records);
     }
 
+    private void createGrid() {
+        grid.addThemeVariants(GridVariant.LUMO_ROW_STRIPES);
+        grid.addClassName("grid");
+
+        grid.addComponentColumn(entry -> {
+            Image icon = new Image(entry.getImageLink(), entry.getName());
+            icon.setMaxHeight(50, Unit.PIXELS);
+            VerticalLayout layout = new VerticalLayout(icon);
+            layout.setPadding(false);
+            return layout;
+        }).setHeader("Icon");
+
+        grid.addColumn("name").setHeader("Name");
+
+        grid.addComponentColumn(entry -> {
+            Icon icon = (entry.getItemBannedOnFlea() ? LumoIcon.CROSS : LumoIcon.CHECKMARK).create();
+            icon.setColor(entry.getItemBannedOnFlea() ? "var(--lumo-error-text-color)" : "var(--lumo-success-text-color)");
+            return icon;
+        }).setHeader("Can be sold on Flea Market");
+
+        grid.addColumn(gameMode == GameMode.PvP ? "pvpFleaValue" : "pveFleaValue").setRenderer(new TextRenderer<>(entry -> "₽ " + (gameMode == GameMode.PvP ? entry.getPvpFleaValue() : entry.getPveFleaValue()))).setHeader("Flea Market Value");
+        grid.addColumn(gameMode == GameMode.PvP ? "pvpTraderValue" : "pveTraderValue").setRenderer(new TextRenderer<>(entry -> "₽ " + (gameMode == GameMode.PvP ? entry.getPvpTraderValue() : entry.getPveTraderValue()))).setHeader("Trader Value");
+
+        grid.addComponentColumn(entry -> {
+            HorizontalLayout layout = new HorizontalLayout();
+            for (String tag : entry.getTags().split("\\|")) {
+                Span badge = new Span(new Span(tag));
+                badge.getElement().getThemeList().add("badge");
+                layout.add(badge);
+            }
+            return layout;
+        }).setHeader("Tags");
+
+        grid.addComponentColumn(entry -> {
+            Button wikiButton = new Button("Wiki", VaadinIcon.BOOKMARK.create());
+            wikiButton.setTooltipText("Opens the Tarkov Wiki page for this item");
+            wikiButton.addClickListener(_ -> UI.getCurrent().getPage().open(entry.getWikiLink(), "_blank"));
+            wikiButton.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
+
+            Button marketButton = new Button("Market", VaadinIcon.GIFT.create());
+            marketButton.setTooltipText("Opens the Tarkov Market page for this item");
+            marketButton.addClickListener(_ -> UI.getCurrent().getPage().open(entry.getMarketLink(), "_blank"));
+            marketButton.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
+
+            return new HorizontalLayout(marketButton, wikiButton);
+        }).setHeader("Actions");
+
+        grid.setSizeFull();
+
+        add(grid);
+    }
 }

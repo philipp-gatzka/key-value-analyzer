@@ -19,5 +19,4 @@ public class AccountRoleRepository extends CrudRepository<AccountRoleRecord> {
         return read(ACCOUNT_ROLE.ACCOUNT_ID.eq(accountId));
     }
 
-
 }

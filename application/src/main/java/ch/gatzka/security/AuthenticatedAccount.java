@@ -21,9 +21,8 @@ public class AuthenticatedAccount {
     public Optional<UserInfo> get() {
         return authenticationContext.getAuthenticatedUser(DefaultOAuth2User.class)
                 .flatMap(userDetails -> {
-                    Optional<AccountRecord> byEmail = accountRepository.findByEmail(userDetails.getName());
-
-                    return byEmail.map(account -> new UserInfo(userDetails.getAttributes(), account));
+                    Optional<AccountRecord> optionalAccount = accountRepository.findByEmail(userDetails.getName());
+                    return optionalAccount.map(account -> new UserInfo(userDetails.getAttributes(), account));
                 });
     }
 
@@ -31,7 +30,8 @@ public class AuthenticatedAccount {
         authenticationContext.logout();
     }
 
-    public static record UserInfo(Map<String, Object> attributes, AccountRecord account) {
+    public record UserInfo(Map<String, Object> attributes, AccountRecord account) {
+
     }
 
 }

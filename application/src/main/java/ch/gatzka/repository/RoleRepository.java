@@ -17,23 +17,16 @@ public class RoleRepository extends CrudRepository<RoleRecord> {
         super(dslContext, ROLE, ROLE_ID_SEQ, ROLE.ID);
     }
 
-    public Optional<RoleRecord> findById(int id) {
-        return find(ROLE.ID.eq(id));
+    public Optional<RoleRecord> findByName(String name) {
+        return find(ROLE.NAME.eq(name));
+    }
+
+    public RoleRecord getUserRole() {
+        return findByName("USER").orElseThrow(() -> new RuntimeException("User role not found"));
     }
 
     public boolean existsByName(String name) {
         return exists(ROLE.NAME.eq(name));
     }
 
-    public Optional<RoleRecord> findByName(String name) {
-        return find(ROLE.NAME.eq(name));
-    }
-
-    public RoleRecord getAdminRole() {
-        return findByName("ADMIN").orElseThrow(() -> new RuntimeException("Admin role not found"));
-    }
-
-    public RoleRecord getUserRole() {
-        return findByName("USER").orElseThrow(() -> new RuntimeException("User role not found"));
-    }
 }

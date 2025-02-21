@@ -3,6 +3,7 @@ package ch.gatzka.repository;
 import ch.gatzka.core.repository.CrudRepository;
 import ch.gatzka.tables.records.AccountRecord;
 import org.jooq.DSLContext;
+import org.jooq.Table;
 import org.springframework.stereotype.Service;
 
 import java.util.Optional;
@@ -17,11 +18,8 @@ public class AccountRepository extends CrudRepository<AccountRecord> {
         super(dslContext, ACCOUNT, ACCOUNT_ID_SEQ, ACCOUNT.ID);
     }
 
-    public Optional<AccountRecord> findByEmail(String username) {
-        return find(ACCOUNT.EMAIL.eq(username));
+    public Optional<AccountRecord> findByEmail(String email) {
+        return find(ACCOUNT.EMAIL.eq(email));
     }
 
-    public boolean existsByEmail(String username) {
-        return exists(ACCOUNT.EMAIL.eq(username));
-    }
 }

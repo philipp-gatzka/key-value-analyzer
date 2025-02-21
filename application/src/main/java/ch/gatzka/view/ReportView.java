@@ -1,16 +1,16 @@
 package ch.gatzka.view;
 
+import ch.gatzka.enums.GameMode;
 import ch.gatzka.repository.ItemRepository;
 import ch.gatzka.repository.KeyReportRepository;
 import ch.gatzka.repository.KeyRepository;
 import ch.gatzka.repository.LootReportRepository;
-import ch.gatzka.repository.view.HighestItemPriceRepository;
+import ch.gatzka.repository.view.ItemPriceViewRepository;
 import ch.gatzka.security.AuthenticatedAccount;
-import ch.gatzka.tables.records.HighestItemPriceRecord;
+import ch.gatzka.tables.records.ItemPriceViewRecord;
 import ch.gatzka.tables.records.ItemRecord;
 import ch.gatzka.tables.records.KeyRecord;
 import com.vaadin.flow.component.ClickEvent;
-import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.Unit;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
@@ -19,7 +19,6 @@ import com.vaadin.flow.component.dialog.Dialog;
 import com.vaadin.flow.component.grid.Grid;
 import com.vaadin.flow.component.grid.GridVariant;
 import com.vaadin.flow.component.html.Div;
-import com.vaadin.flow.component.html.H3;
 import com.vaadin.flow.component.html.Image;
 import com.vaadin.flow.component.icon.Icon;
 import com.vaadin.flow.component.icon.VaadinIcon;
@@ -28,6 +27,7 @@ import com.vaadin.flow.component.orderedlayout.FlexComponent;
 import com.vaadin.flow.component.orderedlayout.FlexLayout;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
+import com.vaadin.flow.component.select.Select;
 import com.vaadin.flow.component.textfield.IntegerField;
 import com.vaadin.flow.data.renderer.ComponentRenderer;
 import com.vaadin.flow.router.Menu;
@@ -35,62 +35,93 @@ import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
 import jakarta.annotation.security.RolesAllowed;
 import lombok.Getter;
+import org.vaadin.lineawesome.LineAwesomeIcon;
 import org.vaadin.lineawesome.LineAwesomeIconUrl;
 
 import java.time.LocalDateTime;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 
 @PageTitle("Report")
 @Route("report")
-@Menu(order = 2, icon = LineAwesomeIconUrl.LIST_SOLID)
+@Menu(order = 3, icon = LineAwesomeIconUrl.PLUS_SOLID)
 @RolesAllowed("USER")
 public class ReportView extends VerticalLayout {
 
-    private final AuthenticatedAccount authenticatedAccount;
-
-    private final KeyReportRepository keyReportRepository;
-    private final LootReportRepository lootReportRepository;
-    private Optional<KeyRecord> selectedKey = Optional.empty();
-
-    private final KeyRepository keyRepository;
-
-    private final ItemRepository itemRepository;
-
-    private final HighestItemPriceRepository highestItemPriceRepository;
-
-    private final Map<Integer, ItemRecord> items = new HashMap<>();
+    private final ComboBox<KeyRecord> keyComboBox = new ComboBox<>("Select Key");
 
     private final Grid<ItemReport> grid = new Grid<>(ItemReport.class, false);
 
-    private H3 valueDisplay;
+    private final KeyRepository keyRepository;
 
-    private List<ItemReport> loot = new ArrayList<>();
+    private final ItemPriceViewRepository itemPriceViewRepository;
 
-    private ComboBox<KeyRecord> keyComboBox;
+    private final KeyReportRepository keyReportRepository;
 
-    public ReportView(AuthenticatedAccount authenticatedAccount, KeyRepository keyRepository, ItemRepository itemRepository, HighestItemPriceRepository highestItemPriceRepository, KeyReportRepository keyReportRepository, LootReportRepository lootReportRepository) {
-        this.authenticatedAccount = authenticatedAccount;
+    private final LootReportRepository lootReportRepository;
+
+    private final Map<Integer, ItemRecord> items;
+
+    private Optional<KeyRecord> selectedKey = Optional.empty();
+
+    private final List<ItemReport> loot = new ArrayList<>();
+
+    private GameMode gameMode;
+
+    private final AuthenticatedAccount authenticatedAccount;
+
+    public ReportView(KeyRepository keyRepository, ItemRepository itemRepository, ItemPriceViewRepository itemPriceViewRepository, KeyReportRepository keyReportRepository, LootReportRepository lootReportRepository, AuthenticatedAccount authenticatedAccount) {
         this.keyRepository = keyRepository;
-        this.itemRepository = itemRepository;
-        this.highestItemPriceRepository = highestItemPriceRepository;
+        this.itemPriceViewRepository = itemPriceViewRepository;
+        this.keyReportRepository = keyReportRepository;
+        this.lootReportRepository = lootReportRepository;
+        this.authenticatedAccount = authenticatedAccount;
 
-        itemRepository.readAll().forEach(item -> items.put(item.getId(), item));
+        this.items = itemRepository.readAll().intoMap(ItemRecord::getId, item -> item);
+        this.gameMode = authenticatedAccount.get().orElseThrow(() -> new RuntimeException("Account not authenticated")).account().getGameMode();
+
+        setSizeFull();
 
         createHeader();
         createGrid();
         createFooter();
+    }
 
-        setSizeFull();
-        this.keyReportRepository = keyReportRepository;
-        this.lootReportRepository = lootReportRepository;
+    private void createGrid() {
+        grid.addThemeVariants(GridVariant.LUMO_ROW_STRIPES);
+        grid.setSizeFull();
 
-        if (authenticatedAccount.get().isEmpty()) {
-            UI.getCurrent().navigate("/oauth2/authorization/google");
-        }
+        grid.addComponentColumn(entry -> {
+            Image icon = new Image(entry.getImageLink(), entry.getName());
+            icon.setMaxHeight(50, Unit.PIXELS);
+            VerticalLayout layout = new VerticalLayout(icon);
+            layout.setPadding(false);
+            return layout;
+        }).setHeader("Icon");
+
+        grid.addColumn("name").setHeader("Name");
+        grid.addColumn("count").setHeader("Count");
+
+        grid.addColumn(new ComponentRenderer<>(Button::new, (button, loot) -> {
+            button.addThemeVariants(ButtonVariant.LUMO_ICON, ButtonVariant.LUMO_ERROR, ButtonVariant.LUMO_TERTIARY);
+            button.addClickListener(_ -> {
+                this.loot.remove(loot);
+                refreshGrid();
+            });
+            button.setIcon(new Icon(VaadinIcon.TRASH));
+        })).setHeader("Manage");
+
+        grid.setItems(loot);
+        add(grid);
+    }
+
+    private void refreshGrid() {
+        grid.getDataProvider().refreshAll();
     }
 
     private void createHeader() {
-        keyComboBox = new ComboBox<>("Select Key");
         keyComboBox.setRequired(true);
         keyComboBox.setRequiredIndicatorVisible(true);
         keyComboBox.setErrorMessage("Key is required");
@@ -106,10 +137,9 @@ public class ReportView extends VerticalLayout {
             wrapper.setAlignItems(FlexComponent.Alignment.CENTER);
 
             Image image = new Image();
-            image.setSrc(item.getImageLink() != null ? item.getImageLink() : item.getName());
+            image.setSrc(item.getIcon() != null ? item.getIcon() : item.getImageBigLink());
             image.setAlt(item.getName());
-            image.setHeight(50, Unit.PIXELS);
-            image.setWidth("var(--lumo-size-m)");
+            image.setMaxHeight(50, Unit.PIXELS);
             image.getStyle().set("margin-right", "var(--lumo-space-s)");
 
             Div name = new Div();
@@ -124,13 +154,11 @@ public class ReportView extends VerticalLayout {
             wrapper.add(image, name);
             return wrapper;
         }));
-        keyComboBox.addValueChangeListener(event -> {
-            selectedKey = Optional.ofNullable(event.getValue());
-            updateValue();
-        });
+        keyComboBox.addValueChangeListener(event -> selectedKey = Optional.ofNullable(event.getValue()));
 
         Button createButton = new Button("Create Report");
         createButton.addClickListener(this::createReport);
+        createButton.setIcon(VaadinIcon.PLUS.create());
 
         HorizontalLayout header = new HorizontalLayout(keyComboBox, createButton);
         header.setAlignSelf(Alignment.END, createButton);
@@ -138,8 +166,131 @@ public class ReportView extends VerticalLayout {
         add(header);
     }
 
+    private void createFooter() {
+        Button saveButton = new Button("Save");
+        saveButton.setIcon(LineAwesomeIcon.SAVE.create());
+        saveButton.addClickListener(this::saveReport);
+        saveButton.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
+
+        Button resetButton = new Button("Reset");
+        resetButton.setIcon(VaadinIcon.TRASH.create());
+        resetButton.addClickListener(this::reset);
+        resetButton.addThemeVariants(ButtonVariant.LUMO_ERROR);
+
+        HorizontalLayout footer = new HorizontalLayout(saveButton, resetButton);
+        footer.setWidthFull();
+        add(footer);
+    }
+
+    private void reset(ClickEvent<Button> buttonClickEvent) {
+        loot.clear();
+        refreshGrid();
+    }
+
+    private void saveReport(ClickEvent<Button> buttonClickEvent) {
+        if (selectedKey.isEmpty()) {
+            keyComboBox.setInvalid(true);
+            return;
+        } else {
+            keyComboBox.setInvalid(false);
+        }
+
+        if (loot.isEmpty()) {
+            Notification.show("No loot to save");
+            return;
+        }
+
+        Dialog confirmDialog = new Dialog();
+        confirmDialog.setHeaderTitle("Confirm Save");
+
+        Select<GameMode> gameModeSelect = new Select<>();
+        gameModeSelect.setLabel("Game Mode");
+        gameModeSelect.setItems(GameMode.values());
+        gameModeSelect.setRequiredIndicatorVisible(true);
+        gameModeSelect.setEmptySelectionAllowed(false);
+        gameModeSelect.setErrorMessage("Game Mode is required");
+
+        gameModeSelect.addValueChangeListener(event -> this.gameMode = event.getValue());
+
+        confirmDialog.add(gameModeSelect);
+
+        Button confirmButton = new Button("Confirm", _ -> {
+            if (gameModeSelect.isEmpty()) {
+                gameModeSelect.setInvalid(true);
+                return;
+            }
+
+            AuthenticatedAccount.UserInfo userInfo = authenticatedAccount.get().orElseThrow();
+            Integer accountId = userInfo.account().getId();
+
+            Integer keyReportId = keyReportRepository.insertWithSequence(entity -> entity.setReportedAt(LocalDateTime.now()).setMode(gameMode).setKeyId(selectedKey.get().getId()).setAccountId(accountId));
+
+            for (ItemReport itemReport : loot) {
+                lootReportRepository.insertWithSequence(entity -> entity.setKeyReportId(keyReportId).setCount(itemReport.count).setItemId(itemReport.getItem().getId()));
+            }
+
+            Notification.show("Report saved successfully");
+
+            reset(null);
+            confirmDialog.close();
+        });
+
+        confirmButton.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
+
+        Button cancelButton = new Button("Cancel", _ -> confirmDialog.close());
+
+        confirmDialog.getFooter().add(cancelButton, confirmButton);
+        confirmDialog.open();
+    }
+
+    private void addLoot(ItemRecord item, Integer count) {
+        ItemPriceViewRecord itemPrices = itemPriceViewRepository.findByItemId(item.getId()).orElseThrow(() -> new IllegalArgumentException("Item prices not found"));
+
+        int itemValue;
+        String itemValueString;
+        if (gameMode == GameMode.PvP) {
+            if (itemPrices.getPvpFleaValue() > itemPrices.getPvpTraderValue()) {
+                itemValueString = "₽ " + itemPrices.getPvpFleaValue() * count;
+                itemValue = itemPrices.getPvpFleaValue() * count;
+            } else {
+                itemValueString = itemPrices.getPvpTraderValueCurrency() + " " + itemPrices.getPvpTraderValue() * count;
+                itemValue = itemPrices.getPvpTraderValue() * count;
+            }
+        } else {
+            if (itemPrices.getPveFleaValue() > itemPrices.getPveTraderValue()) {
+                itemValueString = "₽ " + itemPrices.getPveFleaValue() * count;
+                itemValue = itemPrices.getPveFleaValue() * count;
+            } else {
+                itemValueString = itemPrices.getPveTraderValueCurrency() + " " + itemPrices.getPveTraderValue() * count;
+                itemValue = itemPrices.getPveTraderValue() * count;
+            }
+        }
+
+        this.loot.add(new ItemReport(item, count, itemValue, itemValueString));
+        refreshGrid();
+    }
+
     private void createReport(ClickEvent<Button> buttonClickEvent) {
         createDialog().open();
+    }
+
+    @Getter
+    public static class ItemReport {
+        private final ItemRecord item;
+        private final String imageLink;
+        private final String name;
+        private final int count;
+        private final int itemValue;
+        private final String itemValueString;
+
+        public ItemReport(ItemRecord item, int count, int itemValue, String itemValueString) {
+            this.item = item;
+            this.imageLink = item.getImageLink();
+            this.name = item.getName();
+            this.count = count;
+            this.itemValue = itemValue;
+            this.itemValueString = itemValueString;
+        }
     }
 
     private Dialog createDialog() {
@@ -178,7 +329,7 @@ public class ReportView extends VerticalLayout {
 
         Button saveButton = new Button("Save");
         saveButton.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
-        saveButton.addClickListener(e -> {
+        saveButton.addClickListener(_ -> {
             if (selectItemBox.isEmpty()) {
                 selectItemBox.setInvalid(true);
             } else if (count.isEmpty()) {
@@ -196,149 +347,4 @@ public class ReportView extends VerticalLayout {
 
         return dialog;
     }
-
-    private void addLoot(ItemRecord item, Integer count) {
-        ItemReport itemReport = new ItemReport(item, count);
-        itemReport.value = ItemReport.getValue(highestItemPriceRepository, item, count);
-        loot.add(itemReport);
-
-        refreshGrid();
-        updateValue();
-    }
-
-    private void createGrid() {
-        grid.addThemeVariants(GridVariant.LUMO_ROW_STRIPES);
-        grid.addComponentColumn(data -> {
-            Image image = new Image(data.imageLink == null ? data.name : data.imageLink, data.name);
-            image.setMaxHeight(50, Unit.PIXELS);
-            return image;
-        }).setHeader("Image");
-        grid.addColumn("name").setHeader("Name");
-        grid.addColumn("count").setHeader("Count");
-        grid.addColumn("value").setHeader("Value");
-        grid.addColumn(new ComponentRenderer<>(Button::new, (button, loot) -> {
-            button.addThemeVariants(ButtonVariant.LUMO_ICON, ButtonVariant.LUMO_ERROR, ButtonVariant.LUMO_TERTIARY);
-            button.addClickListener(e -> {
-                this.loot.remove(loot);
-                refreshGrid();
-                updateValue();
-            });
-            button.setIcon(new Icon(VaadinIcon.TRASH));
-        })).setHeader("Manage");
-
-        grid.setSizeFull();
-        grid.setItems(loot);
-
-        add(grid);
-    }
-
-    private void updateValue() {
-        int keyPrice = 0;
-        if (selectedKey.isPresent()) {
-            KeyRecord key = selectedKey.get();
-            ItemRecord keyItem = items.get(key.getItemId());
-            keyPrice = keyItem.getBuyPrice() != null ? keyItem.getBuyPrice() / key.getUses() : 0;
-        }
-        int lootValue = loot.stream().mapToInt(ItemReport::getValue).sum();
-
-        valueDisplay.setText("₽ " + lootValue + " / ₽ " + keyPrice);
-
-        if (keyPrice > lootValue) {
-            valueDisplay.getStyle().set("color", "var(--lumo-error-text-color)");
-        } else {
-            valueDisplay.getStyle().set("color", "var(--lumo-success-text-color)");
-        }
-    }
-
-    private void refreshGrid() {
-        grid.getDataProvider().refreshAll();
-    }
-
-    private void createFooter() {
-        Button saveButton = new Button("Save");
-        saveButton.addClickListener(this::saveReport);
-
-        Button resetButton = new Button("Reset");
-        resetButton.addClickListener(this::reset);
-
-        valueDisplay = new H3("₽ N/A");
-        valueDisplay.setWidthFull();
-        valueDisplay.getStyle().set("text-align", "right");
-
-        HorizontalLayout footer = new HorizontalLayout(saveButton, resetButton, valueDisplay);
-        footer.setWidthFull();
-        footer.setAlignSelf(Alignment.CENTER, valueDisplay);
-        add(footer);
-    }
-
-    private void reset(ClickEvent<Button> buttonClickEvent) {
-        loot.clear();
-        refreshGrid();
-        updateValue();
-    }
-
-    private void saveReport(ClickEvent<Button> buttonClickEvent) {
-
-        if (selectedKey.isEmpty()) {
-            keyComboBox.setInvalid(true);
-            return;
-        } else {
-            keyComboBox.setInvalid(false);
-        }
-
-        if (loot.isEmpty()) {
-            Notification.show("No loot to save");
-            return;
-        }
-
-        Dialog confirmDialog = new Dialog();
-        confirmDialog.setHeaderTitle("Confirm Save");
-        confirmDialog.add("Are you sure you want to save the report?");
-
-        Button confirmButton = new Button("Confirm", _ -> {
-            AuthenticatedAccount.UserInfo userInfo = authenticatedAccount.get().orElseThrow();
-            Integer accountId = userInfo.account().getId();
-
-            Integer keyReportId = keyReportRepository.insertWithSequence(entity -> entity.setReportedAt(LocalDateTime.now()).setKeyId(selectedKey.get().getId()).setReportedBy(accountId));
-
-            for (ItemReport itemReport : loot) {
-                lootReportRepository.insertWithSequence(entity -> entity.setKeyReportId(keyReportId).setCount(itemReport.count).setItemId(itemReport.getItem().getId()));
-            }
-
-            Notification.show("Report saved successfully");
-
-            loot.clear();
-            refreshGrid();
-            updateValue();
-            confirmDialog.close();
-        });
-        confirmButton.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
-
-        Button cancelButton = new Button("Cancel", _ -> confirmDialog.close());
-
-        confirmDialog.getFooter().add(cancelButton, confirmButton);
-        confirmDialog.open();
-    }
-
-    @Getter
-    public static class ItemReport {
-        private final ItemRecord item;
-        private final String imageLink;
-        private final String name;
-        private final int count;
-        private int value;
-
-        public ItemReport(ItemRecord item, int count) {
-            this.item = item;
-            this.imageLink = item.getImageLink();
-            this.name = item.getName();
-            this.count = count;
-        }
-
-        private static int getValue(HighestItemPriceRepository highestItemPriceRepository, ItemRecord item, int count) {
-            Optional<HighestItemPriceRecord> highestPrice = highestItemPriceRepository.findByItemId(item.getId());
-            return highestPrice.map(highestItemPriceRecord -> highestItemPriceRecord.getHighestSellPrice() * count).orElse(0);
-        }
-    }
-
 }

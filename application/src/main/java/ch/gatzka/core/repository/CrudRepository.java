@@ -4,13 +4,11 @@ import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.Nullable;
 import org.jooq.*;
 
-import java.util.HashMap;
-import java.util.Map;
 import java.util.Optional;
 import java.util.function.Function;
 
 @Slf4j
-public abstract class CrudRepository<R extends UpdatableRecord<R>> extends Repository<R> {
+public abstract class CrudRepository<R extends UpdatableRecord<R>> extends ReadOnlyRepository<R> {
 
     @Nullable
     private final Sequence<Integer> sequence;

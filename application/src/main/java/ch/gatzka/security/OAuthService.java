@@ -36,14 +36,18 @@ public class OAuthService extends DefaultOAuth2UserService {
 
         String email = oauthUser.getAttribute("email");
 
-        if (!accountRepository.existsByEmail(email)) {
+        Optional<AccountRecord> optionalAccount = accountRepository.findByEmail(email);
+
+        if (optionalAccount.isEmpty()) {
             log.info("Creating new user account for email: {}", email);
             Integer accountId = accountRepository.insertWithSequence(account -> account.setEmail(email));
             Integer userRoleId = roleRepository.getUserRole().getId();
             accountRoleRepository.insert(accountRole -> accountRole.setAccountId(accountId).setRoleId(userRoleId));
+            optionalAccount = accountRepository.findByEmail(email);
         }
+        AccountRecord account = optionalAccount.orElseThrow(() -> new RuntimeException("Could not find account for email: " + email));
 
-        return new DefaultOAuth2User(getAuthorities(accountRepository.findByEmail(email).orElseThrow()), oauthUser.getAttributes(), "email");
+        return new DefaultOAuth2User(getAuthorities(account), oauthUser.getAttributes(), "email");
     }
 
     private List<GrantedAuthority> getAuthorities(AccountRecord account) {
