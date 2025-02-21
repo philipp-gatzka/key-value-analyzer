@@ -23,6 +23,8 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-oauth2-client")
     implementation("org.parttio:line-awesome:2.1.0")
 
+    developmentOnly("org.springframework.boot:spring-boot-devtools:3.3.4")
+
     runtimeOnly("org.postgresql:postgresql:42.7.5")
     runtimeOnly("org.springframework.boot:spring-boot-starter-actuator")
 }
