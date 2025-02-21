@@ -1,11 +1,4 @@
 @import url('./main-layout.css');
-@import url('./views/grid.css');
-
-/* html {
-    --lumo-font-family: 'Bender Regular'
-} */
-
-
 
 [theme~="dark"] {
     --lumo-shade-5pct: rgba(28, 31, 34, 0.05);
