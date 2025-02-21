@@ -32,10 +32,6 @@ val databaseContainer = PostgreSQLContainer<Nothing>("postgres:15").apply {
     start()
 }
 
-val databaseUrl = project.properties["database.url"] as String?
-val databaseUser = project.properties["database.user"] as String?
-val databasePassword = project.properties["database.password"] as String?
-
 jooq {
     configuration {
         jdbc {
