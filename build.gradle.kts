@@ -3,9 +3,11 @@ plugins {
     id("net.researchgate.release") version "3.1.0"
 }
 
+val version: String by project
+
 subprojects {
     group = "ch.gatzka"
-    version = "1.0.0-SNAPSHOT"
+    version = version
 
     repositories {
         mavenCentral()
