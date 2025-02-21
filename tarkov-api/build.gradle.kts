@@ -1,7 +1,5 @@
 @file:Suppress("SpellCheckingInspection")
 
-import com.apollographql.apollo.gradle.internal.ApolloGenerateSourcesTask
-
 
 plugins {
     id("idea")
@@ -34,7 +32,6 @@ apollo {
             schemaFile.set(apolloSchemaFile)
         }
         schemaFile.set(apolloSchemaFile)
-
     }
 }
 
